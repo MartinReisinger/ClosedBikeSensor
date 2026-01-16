@@ -66,7 +66,7 @@ LiDAR works best on matte surfaces in good lighting. Optimal range is 0.5m to 5m
 
 ## Project Status
 
-This is a student's side project built to learn iOS development. It works well for its intended purpose but don't expect polish everywhere. Contributions and feedback are welcome.
+This is a student's side project built to learn iOS development, I used AI to assist me especially setting up the LiDAR communication. It works well for its intended purpose but don't expect polish everywhere. Feedback is welcome.
 
 ## Future Ideas
 
