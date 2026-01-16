@@ -1,6 +1,6 @@
 # ClosedBikeSensor 🚲
 
-An iOS app for measuring passing distances while cycling using your iPhone's LiDAR sensor. Inspired by the [OpenBikeSensor](https://www.openbikesensor.org/) project, this app leverages the built-in LiDAR capabilities of modern iPhones for a simpler, hardware-integrated solution.
+An iOS app for measuring passing distances while cycling using your iPhone's LiDAR sensor. Funcionaly inspired by the [OpenBikeSensor](https://www.openbikesensor.org/) project, but this app leverages the built-in LiDAR capabilities of modern iPhones for a simpler, hardware-integrated solution.
 
 ## Overview
 
