@@ -17,7 +17,8 @@ Mount your phone on the left side of your handlebar using a 3D-printed mirror at
 - iPhone 12 Pro or newer (LiDAR sensor required)
 - iOS 26.0 or later
 - Camera and Location permissions
-- Left-side handlebar mount + 3D-printed mirror attachment
+- Left-side handlebar mount
+- 3D-printed mirror attachment (in progress)
 
 ## How To Use
 
