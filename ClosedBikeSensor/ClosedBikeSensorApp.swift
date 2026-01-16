@@ -2,7 +2,9 @@
 //  ClosedBikeSensorApp.swift
 //  ClosedBikeSensor
 //
-//  Created by Martin Reisinger on 28.09.25.
+//  Created by Martin Reisinger on 30.09.25.
+//
+//  Main app entry point. Configures SwiftData model container and sets up the app window.
 //
 
 import SwiftUI
@@ -12,7 +14,8 @@ import SwiftData
 struct ClosedBikeSensorApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
-            Item.self,
+            MeasureSession.self,
+            MeasurePoint.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
