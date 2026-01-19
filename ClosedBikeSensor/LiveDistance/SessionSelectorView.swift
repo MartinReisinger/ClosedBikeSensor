@@ -7,6 +7,7 @@
 //  Horizontal scrollable session selector with ability to create new sessions, switch between
 //  existing sessions, and edit session names via long-press gesture.
 //
+//
 
 import SwiftUI
 import SwiftData
@@ -32,68 +33,19 @@ struct SessionSelectorView: View {
             
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 16) {
-                    
-                    // MARK: - New Session Button
-                    Button {
-                        showNewSessionAlert = true
-                    } label: {
-                        VStack(spacing: 6) {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.largeTitle)
-                                .foregroundColor(.blue)
-                            Text("Neu")
-                                .font(.caption)
-                                .foregroundColor(.blue)
-                        }
-                        .frame(width: 100, height: 100)
-                        .background(Color.gray.opacity(0.15))
-                        .cornerRadius(16)
-                        .shadow(radius: 1)
-                    }
-                    
-                    // MARK: - Existing Sessions
-                    ForEach(sessions.prefix(10)) { session in
-                        SessionCardView(
-                            session: session,
-                            isSelected: captureManager.currentSession?.id == session.id,
-                            isLongPressed: longPressedSessionId == session.id
-                        )
-                        .onTapGesture {
-                            selectedSession = session
-                            captureManager.switchToSession(session)
-                        }
-                        .onLongPressGesture(minimumDuration: 0.25, pressing: { isPressing in
-                            if isPressing {
-                                // Visual feedback on start
-                                longPressedSessionId = session.id
-                            } else {
-                                // Reset when released without completion
-                                if editingSession?.id != session.id {
-                                    longPressedSessionId = nil
-                                }
-                            }
-                        }, perform: {
-                            // Haptic feedback after 0.35s
-                            let generator = UIImpactFeedbackGenerator(style: .rigid)
-                            generator.impactOccurred()
-                            
-                            // Show sheet
-                            editingSession = session
-                            showEditSessionSheet = true
-                            longPressedSessionId = nil
-                        })
-                    }
+                    newSessionButton
+                    existingSessionsList
                 }
                 .padding(.vertical, 8)
             }
         }
-        // New Session Alert
         .alert("Neue Session", isPresented: $showNewSessionAlert) {
             TextField("Name (optional)", text: $newSessionName)
             Button("Abbrechen", role: .cancel) { newSessionName = "" }
             Button("Erstellen") { createNewSession() }
-        } message: { Text("Erstelle eine neue Mess-Session") }
-        // Edit Session Sheet
+        } message: {
+            Text("Erstelle eine neue Mess-Session")
+        }
         .sheet(isPresented: $showEditSessionSheet, onDismiss: {
             editingSession = nil
             longPressedSessionId = nil
@@ -101,42 +53,174 @@ struct SessionSelectorView: View {
             if let session = editingSession {
                 EditSessionSheet(
                     session: session,
+                    sessionsCount: sessions.count,
                     onDelete: {
-                        modelContext.delete(session)
-                        try? modelContext.save()
-                        if selectedSession?.id == session.id { selectedSession = nil }
-                        showEditSessionSheet = false
+                        deleteSession(session)
                     },
                     onSave: { name in
-                        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-                        session.name = trimmed.isEmpty ? "Session \(session.number)" : trimmed
-                        try? modelContext.save()
-                        showEditSessionSheet = false
+                        saveSessionName(session: session, name: name)
                     }
                 )
             }
         }
     }
     
+    // MARK: - New Session Button
+    
+    private var newSessionButton: some View {
+        Button {
+            showNewSessionAlert = true
+        } label: {
+            VStack(spacing: 6) {
+                Image(systemName: "plus.circle.fill")
+                    .font(.largeTitle)
+                    .foregroundColor(.blue)
+                Text("Neu")
+                    .font(.caption)
+                    .foregroundColor(.blue)
+            }
+            .frame(width: 100, height: 100)
+            .background(Color.gray.opacity(0.15))
+            .cornerRadius(16)
+            .shadow(radius: 1)
+        }
+    }
+    
+    // MARK: - Existing Sessions List
+    
+    private var existingSessionsList: some View {
+        ForEach(sessions.prefix(10)) { session in
+            SessionCardView(
+                session: session,
+                isSelected: captureManager.currentSession?.id == session.id,
+                isLongPressed: longPressedSessionId == session.id
+            )
+            .onTapGesture {
+                selectSession(session)
+            }
+            .onLongPressGesture(minimumDuration: 0.25, pressing: { isPressing in
+                handleLongPressChange(isPressing: isPressing, session: session)
+            }, perform: {
+                showEditSheet(for: session)
+            })
+        }
+    }
+    
+    // MARK: - Actions
+    
+    /// Selects a session and switches the capture manager to it
+    private func selectSession(_ session: MeasureSession) {
+        selectedSession = session
+        captureManager.switchToSession(session)
+    }
+    
+    /// Creates a new session with the next sequential number
     private func createNewSession() {
-        let nextNumber = (sessions.first?.number ?? 0) + 1
+        // Get next session number
+        let nextNumber = (sessions.map(\.number).max() ?? 0) + 1
+        
+        // Trim and validate name
         let trimmedName = newSessionName.trimmingCharacters(in: .whitespacesAndNewlines)
         let finalName = trimmedName.isEmpty ? "Session \(nextNumber)" : trimmedName
+        
+        // Create session
         let session = MeasureSession(
             number: nextNumber,
             name: finalName,
             startDate: Date()
         )
-        modelContext.insert(session)
-        try? modelContext.save()
         
-        captureManager.switchToSession(session)
-        selectedSession = session
-        newSessionName = ""
+        modelContext.insert(session)
+        
+        do {
+            try modelContext.save()
+            
+            // Switch to new session
+            captureManager.switchToSession(session)
+            selectedSession = session
+            
+            // Reset form
+            newSessionName = ""
+            
+            print("✅ Created new session: \(session.displayName)")
+        } catch {
+            print("❌ Error creating session: \(error.localizedDescription)")
+        }
+    }
+    
+    /// Saves the edited session name
+    private func saveSessionName(session: MeasureSession, name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Never allow empty names - fallback to "Session N"
+        session.name = trimmed.isEmpty ? "Session \(session.number)" : trimmed
+        
+        do {
+            try modelContext.save()
+            showEditSessionSheet = false
+            print("✅ Updated session name: \(session.displayName)")
+        } catch {
+            print("❌ Error saving session name: \(error.localizedDescription)")
+        }
+    }
+    
+    /// Deletes a session (prevents deletion of last session)
+    private func deleteSession(_ session: MeasureSession) {
+        // CRITICAL: Cannot delete the last remaining session
+        guard sessions.count > 1 else {
+            print("⚠️ Cannot delete last session")
+            return
+        }
+        
+        // Notify capture manager that session is being deleted
+        captureManager.handleSessionDeleted(session)
+        
+        // Delete from context
+        modelContext.delete(session)
+        
+        do {
+            try modelContext.save()
+            
+            // Clear selected session if it was deleted
+            if selectedSession?.id == session.id {
+                selectedSession = nil
+            }
+            
+            showEditSessionSheet = false
+            print("✅ Deleted session: \(session.displayName)")
+        } catch {
+            print("❌ Error deleting session: \(error.localizedDescription)")
+        }
+    }
+    
+    /// Shows the edit sheet for a session
+    private func showEditSheet(for session: MeasureSession) {
+        // Haptic feedback
+        let generator = UIImpactFeedbackGenerator(style: .rigid)
+        generator.impactOccurred()
+        
+        // Show sheet
+        editingSession = session
+        showEditSessionSheet = true
+        longPressedSessionId = nil
+    }
+    
+    /// Handles long press state changes for visual feedback
+    private func handleLongPressChange(isPressing: Bool, session: MeasureSession) {
+        if isPressing {
+            // Visual feedback on start
+            longPressedSessionId = session.id
+        } else {
+            // Reset when released without completion
+            if editingSession?.id != session.id {
+                longPressedSessionId = nil
+            }
+        }
     }
 }
 
 // MARK: - Session Card View
+
 private struct SessionCardView: View {
     let session: MeasureSession
     let isSelected: Bool
@@ -147,10 +231,12 @@ private struct SessionCardView: View {
             Text("\(session.number)")
                 .font(.title2)
                 .fontWeight(.bold)
+            
             Text(session.displayName)
                 .font(.caption)
                 .lineLimit(1)
                 .truncationMode(.tail)
+            
             HStack(spacing: 4) {
                 Image(systemName: "list.bullet")
                     .font(.caption2)
@@ -172,66 +258,32 @@ private struct SessionCardView: View {
 }
 
 // MARK: - Edit Session Sheet
+
 private struct EditSessionSheet: View {
     let session: MeasureSession
+    let sessionsCount: Int
     let onDelete: () -> Void
     let onSave: (_ name: String) -> Void
     
     @Environment(\.dismiss) private var dismiss
     @State private var sessionName: String
     
-    init(session: MeasureSession, onDelete: @escaping () -> Void, onSave: @escaping (_ name: String) -> Void) {
+    init(session: MeasureSession, sessionsCount: Int, onDelete: @escaping () -> Void, onSave: @escaping (_ name: String) -> Void) {
         self.session = session
+        self.sessionsCount = sessionsCount
         self.onDelete = onDelete
         self.onSave = onSave
-        _sessionName = State(initialValue: session.name ?? "")
+        
+        // Initialize with current name or default
+        _sessionName = State(initialValue: session.name ?? "Session \(session.number)")
     }
     
     var body: some View {
         NavigationStack {
             Form {
-                Section(header: Text("Session Info")) {
-                    TextField("Name", text: $sessionName)
-                    
-                }
-                
-                Section("Details") {
-                    HStack {
-                        Text("Nummer")
-                            .foregroundColor(.secondary)
-                        Spacer()
-                        Text("\(session.number)")
-                            .foregroundColor(.secondary)
-                    }
-                    HStack {
-                        Text("Messungen")
-                            .foregroundColor(.secondary)
-                        Spacer()
-                        Text("\(session.measurements.count)")
-                            .foregroundColor(.secondary)
-                    }
-                    HStack {
-                        Text("Start am")
-                            .foregroundColor(.secondary)
-                        Spacer()
-                        Text(session.startDate, formatter: dateTimeFormatter)
-                                .foregroundColor(.secondary)
-                    }
-                    HStack {
-                        Text("Ende am")
-                            .foregroundColor(.secondary)
-                        Spacer()
-                        Text(session.endDate, formatter: dateTimeFormatter)
-                                .foregroundColor(.secondary)
-                    }
-                }
-                
-                Section {
-                    Button("Löschen", role: .destructive) {
-                        onDelete()
-                        dismiss()
-                    }
-                }
+                sessionInfoSection
+                detailsSection
+                deleteSection
             }
             .navigationTitle("Session bearbeiten")
             .toolbar {
@@ -250,14 +302,79 @@ private struct EditSessionSheet: View {
             }
         }
     }
+    
+    // MARK: - Session Info Section
+    
+    private var sessionInfoSection: some View {
+        Section(header: Text("Session Info")) {
+            TextField("Name", text: $sessionName)
+        }
+    }
+    
+    // MARK: - Details Section
+    
+    private var detailsSection: some View {
+        Section("Details") {
+            DetailRow(label: "Nummer", value: "\(session.number)")
+            DetailRow(label: "Messungen", value: "\(session.measurements.count)")
+            DetailRow(label: "Start am", value: session.startDate, formatter: dateTimeFormatter)
+            DetailRow(label: "Ende am", value: session.endDate, formatter: dateTimeFormatter)
+        }
+    }
+    
+    // MARK: - Delete Section
+    
+    private var deleteSection: some View {
+        Section {
+            Button("Löschen", role: .destructive) {
+                onDelete()
+                dismiss()
+            }
+            .disabled(sessionsCount <= 1) // Prevent deletion of last session
+        }
+    }
 }
+
+// MARK: - Detail Row
+
+private struct DetailRow: View {
+    let label: String
+    let value: String
+    
+    init(label: String, value: String) {
+        self.label = label
+        self.value = value
+    }
+    
+    init(label: String, value: Date?, formatter: DateFormatter) {
+        self.label = label
+        if let value = value {
+            self.value = formatter.string(from: value)
+        } else {
+            self.value = "—"
+        }
+    }
+    
+    var body: some View {
+        HStack {
+            Text(label)
+                .foregroundColor(.secondary)
+            Spacer()
+            Text(value)
+                .foregroundColor(.secondary)
+        }
+    }
+}
+
+// MARK: - Date Formatter
 
 private let dateTimeFormatter: DateFormatter = {
     let formatter = DateFormatter()
-    formatter.dateFormat = "dd.MM.yyyy HH:mm" // Day.Month.Year Hours:Minutes
+    formatter.dateFormat = "dd.MM.yyyy HH:mm"
     return formatter
 }()
 
+// MARK: - Preview
 
 #Preview {
     let mockSession = MeasureSession(number: 1, name: "Test Session", startDate: Date())

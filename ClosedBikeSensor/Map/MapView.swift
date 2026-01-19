@@ -15,6 +15,7 @@ import SwiftData
 struct MapView: View {
     var onStartMeasurement: (() -> Void)? = nil
     @Environment(\.modelContext) private var modelContext
+    @ObservedObject private var captureManager: CaptureManager
     @Query private var sessions: [MeasureSession]
     @State private var region = MKCoordinateRegion(
         center: CLLocationCoordinate2D(latitude: 48.2082, longitude: 16.3738),
@@ -24,6 +25,11 @@ struct MapView: View {
     @State private var selectedSessionIds: Set<UUID> = []
     @State private var showLines = false
     @State private var showFilterSheet = false
+    
+    init(onStartMeasurement: (() -> Void)? = nil, captureManager: CaptureManager) {
+        self.onStartMeasurement = onStartMeasurement
+        self._captureManager = ObservedObject(wrappedValue: captureManager)
+    }
     
     var filteredSessions: [MeasureSession] {
         return sessions.filter { selectedSessionIds.contains($0.id) }
@@ -48,7 +54,13 @@ struct MapView: View {
                         .foregroundColor(.gray)
                         .multilineTextAlignment(.center)
 
-                    Button(action: { onStartMeasurement?() }) {
+                    Button(action: {
+                if captureManager.currentSession == nil {
+                    captureManager.setModelContext(modelContext)
+                    captureManager.startSession()
+                }
+                onStartMeasurement?()
+            }) {
                         Text("Messung starten")
                             .font(.headline)
                             .foregroundColor(.primary)
@@ -307,7 +319,7 @@ extension Color {
 
 #Preview {
     NavigationStack {
-        MapView()
+        MapView(captureManager: CaptureManager())
             .modelContainer(for: [MeasureSession.self, MeasurePoint.self])
     }
 }

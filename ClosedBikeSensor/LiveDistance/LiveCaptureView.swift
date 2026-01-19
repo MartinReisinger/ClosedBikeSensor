@@ -1,5 +1,5 @@
 //
-//  LiveDistanceView.swift
+//  LiveCaptureView.swift
 //  ClosedBikeSensor
 //
 //  Created by Martin Reisinger on 30.09.25.
@@ -8,6 +8,7 @@
 //  Main live measurement view with AR camera preview, real-time distance display,
 //  crosshair overlay, and capture functionality. Includes edit mode for session
 //  management and crosshair adjustment. Volume buttons work as shutter triggers.
+//
 //
 
 import SwiftUI
@@ -19,15 +20,27 @@ import MediaPlayer
 import Combine
 
 // MARK: - Main View
-struct LiveDistanceView: View {
+
+struct LiveCaptureView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \MeasureSession.startDate, order: .reverse) private var sessions: [MeasureSession]
+    @Query(sort: \MeasureSession.startDate, order: .reverse) private var allSessions: [MeasureSession]
     
     @StateObject private var config = RetrievalConfig.shared
     @StateObject private var distanceRetrieval = DistanceRetrieval()
-    @StateObject private var captureManager = CaptureManager()
+    @ObservedObject private var captureManager: CaptureManager
     @StateObject private var volumeButtonHandler = VolumeButtonHandler()
     @State private var editMode = false
+    
+    /// Filter out aggregate session (number == 0)
+    private var realSessions: [MeasureSession] {
+        allSessions.filter { $0.number != 0 }
+    }
+    
+    // MARK: - Initialization
+    
+    init(captureManager: CaptureManager) {
+        self._captureManager = ObservedObject(wrappedValue: captureManager)
+    }
     
     var body: some View {
         ZStack {
@@ -35,7 +48,7 @@ struct LiveDistanceView: View {
             if !editMode { captureButton }
             if captureManager.showFeedback { feedbackOverlay }
         }
-        .navigationTitle(captureManager.currentSession?.displayName ?? "")
+        .navigationTitle(navigationTitle)
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbar {
@@ -48,7 +61,19 @@ struct LiveDistanceView: View {
         }
     }
     
+    // MARK: - Computed Properties
+    
+    /// Dynamic title that updates based on current session state
+    private var navigationTitle: String {
+        if let session = captureManager.currentSession {
+            return session.displayName
+        } else {
+            return "Keine Session"
+        }
+    }
+    
     // MARK: - Main Content
+    
     private var mainContent: some View {
         ScrollView {
             VStack(spacing: 15) {
@@ -64,6 +89,7 @@ struct LiveDistanceView: View {
     }
     
     // MARK: - Camera Preview with Crosshair
+    
     private var cameraPreview: some View {
         ZStack {
             if config.isSessionRunning {
@@ -93,6 +119,7 @@ struct LiveDistanceView: View {
     }
     
     // MARK: - Distance Display
+    
     private var distanceDisplay: some View {
         DistanceDisplayView(
             distance: config.centerDistance,
@@ -102,9 +129,10 @@ struct LiveDistanceView: View {
     }
     
     // MARK: - Session Selector
+    
     private var sessionSelector: some View {
         SessionSelectorView(
-            sessions: sessions,
+            sessions: realSessions, // Only show real sessions (no aggregate)
             selectedSession: Binding(
                 get: { captureManager.currentSession },
                 set: { if let session = $0 { captureManager.switchToSession(session) } }
@@ -116,6 +144,7 @@ struct LiveDistanceView: View {
     }
     
     // MARK: - Crosshair Controls
+    
     private var crosshairControls: some View {
         VStack(spacing: 15) {
             Text("Fadenkreuz Position")
@@ -152,6 +181,7 @@ struct LiveDistanceView: View {
     }
     
     // MARK: - Capture Button
+    
     private var captureButton: some View {
         VStack {
             Spacer()
@@ -175,6 +205,7 @@ struct LiveDistanceView: View {
     }
     
     // MARK: - Feedback Overlay
+    
     private var feedbackOverlay: some View {
         VStack {
             HStack {
@@ -193,6 +224,7 @@ struct LiveDistanceView: View {
     }
     
     // MARK: - Restart Onboarding Button
+    
     private var restartOnboardingButton: some View {
         Button(action: restartOnboarding) {
             HStack {
@@ -211,9 +243,14 @@ struct LiveDistanceView: View {
     }
     
     // MARK: - Toolbar
+    
     private var editButton: some ToolbarContent {
         ToolbarItem(placement: .navigationBarTrailing) {
             Button(editMode ? "Fertig" : "Bearbeiten") {
+                // When entering edit mode, ensure a session is selected
+                if !editMode && captureManager.currentSession == nil {
+                    captureManager.restoreOrStartSession()
+                }
                 editMode.toggle()
             }
             .foregroundStyle(.primary)
@@ -221,6 +258,7 @@ struct LiveDistanceView: View {
     }
     
     // MARK: - Crosshair Position Calculation
+    
     /// Converts internal offset values to screen coordinates
     /// Note: The offset values are inverted because the AR coordinate system
     /// is different from the UI coordinate system:
@@ -235,14 +273,17 @@ struct LiveDistanceView: View {
     }
     
     // MARK: - Actions
+    
     private func setupView() {
         captureManager.setModelContext(modelContext)
         distanceRetrieval.startSession()
+        
+        // Always ensure a session exists on view appear
         if captureManager.currentSession == nil {
             captureManager.restoreOrStartSession()
         }
         
-        // Setup volume button handler
+        // Setup volume button handler for capture
         volumeButtonHandler.onVolumeButtonPressed = {
             if !self.editMode {
                 self.captureDistance()
@@ -431,4 +472,3 @@ class VolumeButtonHandler: NSObject, ObservableObject {
         stopListening()
     }
 }
-
