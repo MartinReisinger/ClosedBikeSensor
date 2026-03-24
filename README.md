@@ -1,50 +1,115 @@
-# ClosedBikeSensor 🚲
+# ClosedBikeSensor — Passing Distance Measurement for Cyclists
 
-An iOS app for measuring passing distances while cycling using your iPhone's LiDAR sensor. Funcionaly inspired by the [OpenBikeSensor](https://www.openbikesensor.org/) project, but this app leverages the built-in LiDAR capabilities of modern iPhones for a simpler, hardware-integrated solution.
+iOS-App zur Messung von Überholabständen beim Radfahren via iPhone LiDAR.  
+Funktional inspiriert vom [OpenBikeSensor](https://www.openbikesensor.org/)-Projekt — ohne zusätzliche Hardware.
 
-## Overview
+---
 
-Mount your phone on the left side of your handlebar using a 3D-printed mirror attachment (STL files in repo) that redirects the LiDAR beam and camera sideways. This allows you to measure passing traffic while keeping the phone facing forward for easy navigation and interaction.
+## 📱 Überblick
 
-### Key Features
-- **LiDAR Precision**: Uses ARKit to process real-time depth data (optimal range: 0.5m – 5m).
-- **Physical Trigger**: Use the **volume up button** as a tactile shutter while riding, or tap the screen.
-- **Privacy First**: All data (GPS, photos, measurements) is stored locally via SwiftData. No cloud, no ads.
-- **Visual Feedback**: Color-coded markers: Red (≤1.0m), Yellow (≤1.5m), and Green (>1.5m).
+Das iPhone wird mit einem 3D-gedruckten Spiegelaufsatz links am Lenker montiert. Der Aufsatz lenkt den LiDAR-Strahl und die Kamera um 90° nach links um — so können Überholabstände gemessen werden, während das Display nach vorne zeigt und bedienbar bleibt.
 
-## Requirements
+### ✨ Features
 
-- iPhone 12 Pro or newer (LiDAR sensor required)
-- iOS 26.0 or later
-- Camera and Location permissions
-- Left-side handlebar mount
-- 3D-printed mirror attachment (in progress)
+- **LiDAR-Präzision** — ARKit verarbeitet Tiefendaten in Echtzeit (optimaler Bereich: 0,5 m – 5 m)
+- **Physischer Auslöser** — Lautstärke-hoch-Taste als taktiler Shutter beim Fahren, alternativ Tipp auf den Bildschirm
+- **Privacy First** — alle Daten (GPS, Fotos, Messungen) werden lokal via SwiftData gespeichert. Keine Cloud, keine Werbung
+- **Farbkodierung** — Rot (≤ 1,0 m), Gelb (≤ 1,5 m), Grün (> 1,5 m)
+- **Kartenansicht** — alle Messpunkte farbkodiert auf interaktiver Karte, filterbar nach Session
+- **Session-Verwaltung** — mehrere Fahrten getrennt verwalten, benennen und analysieren
 
-## How To Use
+---
 
-1. **Hardware Setup**: Mount the phone on the left side of your handlebar. The mirror attachment must redirect the camera/LiDAR 90° to the left.
-2. **First Run**: Grant camera and location permissions. 
-3. **Capture**: In the **Live** tab, press the volume button when a car passes. The crosshair indicates the sampling area (adjustable in "Edit" mode).
-4. **Analysis**: 
-   - **Sessions**: View ride statistics and charts.
-   - **Map**: See color-coded measurement markers on an interactive map.
+## 📋 Voraussetzungen
 
-## Technical Implementation
+- iPhone 12 Pro oder neuer (LiDAR-Sensor erforderlich)
+- iOS 26.0 oder neuer
+- Kamera- und Standortberechtigung
+- Linke Lenkerhalterung
+- 3D-gedruckter Spiegelaufsatz (STL-Dateien im Repo, in Arbeit)
 
-- **Data Capture**: A background queue samples and smoothes LiDAR depth data around the crosshair to reduce jitter.
-- **Storage**: Photos are compressed and stored alongside GPS data using **SwiftData**.
-- **Accuracy**: Optimized for matte surfaces; accuracy can be calibrated by adjusting the crosshair offset.
+---
 
-## Project Status
+## 🚀 Verwendung
 
-This is a student side project built to learn iOS development. I utilized AI assistance specifically for setting up the ARKit/LiDAR communication and boilerplate logic. While functional and reliable for its intended purpose, it is a work in progress.
+### 1. Hardware-Setup
+iPhone links am Lenker montieren. Der Spiegelaufsatz muss Kamera und LiDAR um 90° nach links umlenken.
 
-### Future Ideas
-- CSV/GPX export for data analysis.
-- OpenBikeSensor community data sharing.
-- Automatic measurement triggering via CoreML.
+### 2. Erster Start
+Kamera- und Standortberechtigung erteilen (geführter Onboarding-Flow).
 
-## Architecture
-- **Models**: `MeasurePoint`, `MeasureSession` (SwiftData)
-- **Logic**: `DistanceRetrieval` (ARKit processing), `CaptureManager` (Persistence)
-- **Views**: SwiftUI-based views for Onboarding, Live Tracking, Lists, and Maps.
+### 3. Messen
+Im **Live**-Tab Lautstärketaste drücken, wenn ein Auto überholt. Das Fadenkreuz zeigt den Messbereich — im Bearbeitungsmodus (oben rechts) anpassbar.
+
+### 4. Auswertung
+
+| Tab | Inhalt |
+|-----|--------|
+| **Sessions** | Statistiken, Charts und Einzelmessungen pro Fahrt |
+| **Karte** | Alle Messpunkte auf interaktiver Karte, nach Session filterbar |
+
+---
+
+## 🏗️ Technologie-Stack
+
+|                  |                                      |
+|------------------|--------------------------------------|
+| **Plattform**    | iOS 26+, Swift                       |
+| **UI**           | SwiftUI                              |
+| **AR / Depth**   | ARKit (LiDAR, `sceneDepth`)          |
+| **Datenbank**    | SwiftData                            |
+| **Karte**        | MapKit                               |
+| **Standort**     | CoreLocation                         |
+
+---
+
+## 📁 Projektstruktur
+
+```
+ClosedBikeSensor/
+├── Models/
+│   ├── MeasurePoint.swift          # Einzelne Messung (Distanz, GPS, Foto, Datum)
+│   └── MeasureSession.swift        # Fahrt-Session mit Statistiken (min/max/avg/median)
+├── Logic/
+│   ├── DistanceRetrieval.swift     # ARKit-Tiefenverarbeitung, ROI-Filterung, Glättung
+│   ├── CaptureManager.swift        # Session-Lifecycle, GPS, Foto-Komprimierung, SwiftData
+│   ├── RetrievalConfig.swift       # Singleton: App-State, Berechtigungen, Konfiguration
+│   └── LocationPermissionManager.swift
+├── Views/
+│   ├── ContentView.swift           # Root: Onboarding oder Haupt-App
+│   ├── MainTabView.swift           # Tab-Navigation (Live / Sessions / Karte)
+│   ├── LiveCaptureView.swift       # AR-Kameravorschau, Distanzanzeige, Capture-Button
+│   ├── SessionSelectorView.swift   # Horizontaler Session-Picker mit Erstellen/Bearbeiten
+│   ├── MapView.swift               # Interaktive Karte mit farbkodierten Messpunkten
+│   ├── OnboardingView.swift        # 3-schrittiger Onboarding-Flow
+│   └── PermissionCard.swift        # Wiederverwendbare Berechtigungskarte
+└── ClosedBikeSensorApp.swift       # App-Einstiegspunkt, SwiftData ModelContainer
+```
+
+---
+
+## ⚙️ Technische Details
+
+### Tiefenverarbeitung
+
+Ein Hintergrund-Queue sampelt und glättet LiDAR-Tiefendaten im konfigurierbaren ROI (Region of Interest) um das Fadenkreuz. Confidence-basiertes Filtering verwirft unsichere Pixel; ein temporaler Glättungspuffer (konfigurierbare Größe) reduziert Jitter.
+
+### Datenspeicherung
+
+Fotos werden auf max. 1024 px (längste Seite) skaliert und als JPEG (70 %) komprimiert, zusammen mit GPS-Koordinaten via SwiftData gespeichert.
+
+### Genauigkeit
+
+Optimiert für matte Oberflächen. Die Fadenkreuz-Offset-Kalibrierung gleicht Montageungenauigkeiten aus — einstellbar über zwei Slider im Bearbeitungsmodus.
+
+---
+
+## 🗺️ Projektstatus
+
+Studentisches Nebenprojekt zum Erlernen von iOS-Entwicklung. KI-Unterstützung wurde gezielt für ARKit/LiDAR-Kommunikation und Boilerplate-Logik eingesetzt. Die App ist funktionsfähig und für ihren Zweck zuverlässig — aber ein laufendes Projekt.
+
+### Ideen für die Zukunft
+
+- CSV/GPX-Export für externe Analyse
+- Datenaustausch mit der OpenBikeSensor-Community
+- Automatische Auslösung via CoreML
